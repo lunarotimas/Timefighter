@@ -1,6 +1,7 @@
 package com.raywenderlich.timefighter
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -8,6 +9,9 @@ import androidx.appcompat.app.AppCompatActivity
 class MainActivity : AppCompatActivity() {
     //score counter
     private var score = 0
+
+    //assigning class TAG
+    private val TAG = MainActivity::class.java.simpleName
 
     private lateinit var gameScoreTextView: TextView
     private lateinit var timeLeftTextView: TextView
@@ -19,10 +23,18 @@ class MainActivity : AppCompatActivity() {
     private var countDownInterval: Long = 1000
     private var timeLeft = 60
 
+    // tracks the variables to save when rotating
+    companion object {
+        private const val SCORE_KEY = "SCORE_KEY"
+        private const val TIME_LEFT_KEY = "TIME_LEFT_KEY"
+    }
+
     private lateinit var tapMeButton: Button
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        //message logged when activity is created
+        Log.d(TAG, "onCreate called. Score is: $score")
 
         // links views with these names to the variable
         gameScoreTextView = findViewById(R.id.game_score_text_view)
@@ -32,12 +44,33 @@ class MainActivity : AppCompatActivity() {
         //click listener on incrementScore
         tapMeButton.setOnClickListener { incrementScore() }
 
-        //calls resetGame
-        resetGame()
+        //checking if savedInstanceState contains a value and saving from bundle if it does
+        if (savedInstanceState != null) {
+            score = savedInstanceState.getInt(SCORE_KEY)
+            timeLeft = savedInstanceState.getInt(TIME_LEFT_KEY)
+            restoreGame()
+        } else {
+            resetGame()
+        }
+
 
     }
 
-    //a method to start the game when the tapMeButton is tapped and increment the score
+    // passes in the current score when rotated instead of refreshing
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(SCORE_KEY, score)
+        outState.putInt(TIME_LEFT_KEY, timeLeft)
+        countDownTimer.cancel()
+        Log.d(TAG, "onSaveInstanceState: Saving Score: $score & Time Left: $timeLeft")
+    }
+    //calling onDestroy for memory cleanup
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "onDestroy called.")
+    }
+
+        //a method to start the game when the tapMeButton is tapped and increment the score
     private fun incrementScore() {
         if (!gameStarted){
             startGame()
@@ -60,7 +93,7 @@ class MainActivity : AppCompatActivity() {
             initialCountDown,
             countDownInterval
         ) {
-            // 3
+            // Calls onTick every second for 60 seconds and updates how many their are left
             override fun onTick(millisUntilFinished: Long) {
                 timeLeft = millisUntilFinished.toInt() / 1000
                 val timeLeftString = getString(
@@ -87,5 +120,26 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.game_over_message,
             score), Toast.LENGTH_LONG).show()
         resetGame()
+    }
+    //sets up the TextViews and countDownTimer using the Bundle
+    private fun restoreGame() {
+        val restoredScore = getString(R.string.your_score, score)
+        gameScoreTextView.text = restoredScore
+        val restoredTime = getString(R.string.time_left, timeLeft)
+        timeLeftTextView.text = restoredTime
+        countDownTimer = object : CountDownTimer((timeLeft *
+                1000).toLong(), countDownInterval) {
+            override fun onTick(millisUntilFinished: Long) {
+                timeLeft = millisUntilFinished.toInt() / 1000
+                val timeLeftString = getString(R.string.time_left,
+                    timeLeft)
+                timeLeftTextView.text = timeLeftString
+            }
+            override fun onFinish() {
+                endGame()
+            }
+        }
+        countDownTimer.start()
+        gameStarted = true
     }
 }
